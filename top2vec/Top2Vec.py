@@ -9,6 +9,7 @@ from gensim.utils import simple_preprocess
 from gensim.parsing.preprocessing import strip_tags
 import umap
 import hdbscan
+from requests import HTTPError
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from joblib import dump, load
@@ -235,10 +236,6 @@ class Top2Vec:
             self.doc_id2index = dict(zip(self.document_ids, list(range(0, len(self.document_ids)))))
             self.doc_id_type = np.int_
 
-        acceptable_embedding_models = ["universal-sentence-encoder-multilingual",
-                                       "universal-sentence-encoder",
-                                       "distiluse-base-multilingual-cased"]
-
         self.embedding_model_path = embedding_model_path
 
         if embedding_model == 'doc2vec':
@@ -303,7 +300,11 @@ class Top2Vec:
             if use_corpus_file:
                 temp.close()
 
-        elif embedding_model in acceptable_embedding_models:
+        else:
+            try:
+                self._check_model_status()
+            except HTTPError:
+                raise ValueError(f"{embedding_model} is an invalid embedding model.")
 
             self.embed = None
             self.embedding_model = embedding_model
@@ -330,7 +331,7 @@ class Top2Vec:
                                  f"all words being ignored, choose a lower value.")
             self.vocab = [words[ind] for ind in vocab_inds]
 
-            self._check_model_status()
+
 
             logger.info('Creating joint document/word embedding')
 
@@ -345,9 +346,6 @@ class Top2Vec:
                 train_corpus = [' '.join(tokens) for tokens in tokenized_corpus]
                 self.document_vectors = self._embed_documents(train_corpus)
 
-        else:
-            raise ValueError(f"{embedding_model} is an invalid embedding model.")
-
         # create 5D embeddings of documents
         logger.info('Creating lower dimension embedding of documents')
 
@@ -356,7 +354,7 @@ class Top2Vec:
                          'n_components': 5,
                          'metric': 'cosine'}
 
-        umap_model = umap.UMAP(**umap_args).fit(self._get_document_vectors(norm=False))
+        self.umap_model = umap.UMAP(**umap_args).fit(self._get_document_vectors(norm=False))
 
         # find dense areas of document vectors
         logger.info('Finding dense areas of documents')
@@ -366,13 +364,13 @@ class Top2Vec:
                              'metric': 'euclidean',
                              'cluster_selection_method': 'eom'}
 
-        cluster = hdbscan.HDBSCAN(**hdbscan_args).fit(umap_model.embedding_)
+        self.cluster = hdbscan.HDBSCAN(**hdbscan_args).fit(self.umap_model.embedding_)
 
         # calculate topic vectors from dense areas of documents
         logger.info('Finding topics')
 
         # create topic vectors
-        self._create_topic_vectors(cluster.labels_)
+        self._create_topic_vectors(self.cluster.labels_)
 
         # deduplicate topics
         self._deduplicate_topics()
