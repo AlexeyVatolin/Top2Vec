@@ -301,13 +301,13 @@ class Top2Vec:
                 temp.close()
 
         else:
+            self.embed = None
+            self.embedding_model = embedding_model
+
             try:
                 self._check_model_status()
             except HTTPError:
                 raise ValueError(f"{embedding_model} is an invalid embedding model.")
-
-            self.embed = None
-            self.embedding_model = embedding_model
 
             self._check_import_status()
 
