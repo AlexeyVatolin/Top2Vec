@@ -304,12 +304,12 @@ class Top2Vec:
             self.embed = None
             self.embedding_model = embedding_model
 
+            self._check_import_status()
+            logger.info('Loading sentence model')
             try:
                 self._check_model_status()
             except HTTPError:
                 raise ValueError(f"{embedding_model} is an invalid embedding model.")
-
-            self._check_import_status()
 
             logger.info('Pre-processing documents for training')
 
@@ -330,8 +330,6 @@ class Top2Vec:
                 raise ValueError(f"A min_count of {min_count} results in "
                                  f"all words being ignored, choose a lower value.")
             self.vocab = [words[ind] for ind in vocab_inds]
-
-
 
             logger.info('Creating joint document/word embedding')
 
@@ -786,7 +784,7 @@ class Top2Vec:
                               "Call index_word_vectors method before setting use_index=True.")
 
     def _check_import_status(self):
-        if self.embedding_model != 'distiluse-base-multilingual-cased':
+        if self.embedding_model in {"universal-sentence-encoder-multilingual", "universal-sentence-encoder"}:
             if not _HAVE_TENSORFLOW:
                 raise ImportError(f"{self.embedding_model} is not available.\n\n"
                                   "Try: pip install top2vec[sentence_encoders]\n\n"
@@ -802,7 +800,7 @@ class Top2Vec:
             if self.verbose is False:
                 logger.setLevel(logging.DEBUG)
 
-            if self.embedding_model != "distiluse-base-multilingual-cased":
+            if self.embedding_model in {"universal-sentence-encoder-multilingual", "universal-sentence-encoder"}:
                 if self.embedding_model_path is None:
                     logger.info(f'Downloading {self.embedding_model} model')
                     if self.embedding_model == "universal-sentence-encoder-multilingual":
